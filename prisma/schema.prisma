@@ -1,0 +1,109 @@
+// סכמת מסד הנתונים של "סקרים בקהילה"
+// כל שינוי כאן מחייב יצירת Migration חדשה: npm run db:migrate
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum PollStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PollCategory {
+  ENTERTAINMENT
+  FOOD
+  TRIPS
+  SPORT
+  GENERAL
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(50)
+  email        String   @unique @db.VarChar(254)
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+
+  polls Poll[]
+  votes Vote[]
+}
+
+model Poll {
+  id              Int          @id @default(autoincrement())
+  title           String       @db.VarChar(150)
+  description     String?      @db.VarChar(500)
+  category        PollCategory
+  allowMultiple   Boolean      @default(false)
+  closesAt        DateTime
+  status          PollStatus   @default(PENDING)
+  rejectionReason String?      @db.VarChar(300)
+  isHidden        Boolean      @default(false)
+  closedEarlyAt   DateTime?
+  creatorId       Int
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  creator User         @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  options PollOption[]
+  votes   Vote[]
+
+  @@index([status, isHidden])
+  @@index([creatorId])
+  @@index([category])
+  @@index([closesAt])
+}
+
+model PollOption {
+  id       Int    @id @default(autoincrement())
+  pollId   Int
+  text     String @db.VarChar(100)
+  position Int
+
+  poll    Poll         @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  choices VoteChoice[]
+
+  @@unique([pollId, position])
+  @@unique([pollId, text])
+}
+
+// הצבעה אחת של משתמש אחד בסקר אחד (ההגבלה הייחודית מונעת הצבעה כפולה)
+model Vote {
+  id        Int      @id @default(autoincrement())
+  pollId    Int
+  userId    Int
+  createdAt DateTime @default(now())
+
+  poll    Poll         @relation(fields: [pollId], references: [id], onDelete: Restrict)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  choices VoteChoice[]
+
+  @@unique([pollId, userId])
+  @@index([userId])
+}
+
+// האפשרויות שנבחרו בהצבעה (אחת, או כמה בסקר עם בחירה מרובה)
+model VoteChoice {
+  id       Int @id @default(autoincrement())
+  voteId   Int
+  optionId Int
+
+  vote   Vote       @relation(fields: [voteId], references: [id], onDelete: Cascade)
+  option PollOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
+
+  @@unique([voteId, optionId])
+  @@index([optionId])
+}
