@@ -62,7 +62,6 @@ Content-Type: application/json
   "description": "נפגשים אצל דנה ב-20:00",
   "category": "ENTERTAINMENT",
   "categoryLabel": "בילויים",
-  "allowMultiple": false,
   "closesAt": "2026-12-31T20:00:00.000Z",
   "closedEarlyAt": null,
   "status": "APPROVED",
@@ -70,7 +69,7 @@ Content-Type: application/json
   "isOpen": true,
   "rejectionReason": null,
   "voterCount": 3,
-  "optionCount": 4,
+  "questionCount": 2,
   "creator": { "id": 2, "name": "נועה כהן" },
   "hasVoted": false,
   "createdAt": "2026-10-01T10:00:00.000Z",
@@ -90,9 +89,27 @@ Content-Type: application/json
 ```json
 {
   "...": "כל השדות של PollSummary",
-  "options": [
-    { "id": 11, "text": "קומדיה", "position": 1 },
-    { "id": 12, "text": "אקשן", "position": 2 }
+  "questions": [
+    {
+      "id": 1,
+      "text": "איזה סרט נראה?",
+      "allowMultiple": false,
+      "position": 1,
+      "options": [
+        { "id": 11, "text": "קומדיה", "position": 1 },
+        { "id": 12, "text": "אקשן", "position": 2 }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "באיזו שעה נפגשים?",
+      "allowMultiple": true,
+      "position": 2,
+      "options": [
+        { "id": 13, "text": "19:00", "position": 1 },
+        { "id": 14, "text": "20:00", "position": 2 }
+      ]
+    }
   ],
   "myChoices": [],
   "permissions": {
@@ -105,6 +122,9 @@ Content-Type: application/json
 }
 ```
 
+- לכל סקר יש שאלה אחת או יותר (`questions`), ולכל שאלה האפשרויות שלה. `allowMultiple` שייך לשאלה, לא לסקר.
+- `myChoices` - מזהי האפשרויות שבחרת, מכל השאלות יחד.
+
 💡 **`permissions` נועד בדיוק בשבילך:** הוא אומר אילו כפתורים להציג למשתמשת הנוכחית - בלי לחשב בעצמך.
 
 ### PollResults - תוצאות לדיאגרמה
@@ -112,20 +132,27 @@ Content-Type: application/json
 {
   "pollId": 1,
   "title": "איזה סרט נראה בשישי?",
-  "allowMultiple": false,
   "isOpen": true,
   "totalVoters": 3,
-  "totalChoices": 3,
-  "options": [
-    { "id": 11, "text": "קומדיה", "count": 2, "percent": 66.7 },
-    { "id": 12, "text": "אקשן", "count": 1, "percent": 33.3 }
+  "questions": [
+    {
+      "id": 1,
+      "text": "איזה סרט נראה?",
+      "allowMultiple": false,
+      "totalChoices": 3,
+      "options": [
+        { "id": 11, "text": "קומדיה", "count": 2, "percent": 66.7 },
+        { "id": 12, "text": "אקשן", "count": 1, "percent": 33.3 }
+      ]
+    }
   ],
   "myChoices": [11]
 }
 ```
+- התוצאות מחולקות לפי שאלה - דיאגרמה נפרדת לכל שאלה.
 - `count` - כמה בחרו באפשרות; `percent` - אחוז **מתוך המצביעים**.
-- בבחירה מרובה סכום האחוזים יכול לעבור 100% - זה תקין.
-- `options` מתאים ישירות לספריית דיאגרמות (עוגה / עמודות): `text` לתווית, `count` או `percent` לערך.
+- בשאלה עם בחירה מרובה סכום האחוזים יכול לעבור 100% - זה תקין.
+- `options` של כל שאלה מתאים ישירות לספריית דיאגרמות (עוגה / עמודות): `text` לתווית, `count` או `percent` לערך.
 - `myChoices` - לסימון "הבחירה שלי" בדיאגרמה.
 
 ### רשימה עם עמודים
@@ -167,13 +194,13 @@ Content-Type: application/json
 | GET | `/polls/:id` | 🔓 (Token אופציונלי) | פרטי סקר | 200 `PollDetails` |
 | POST | `/polls` | 🔑 | יצירת סקר | 201 `PollDetails` |
 | PUT | `/polls/:id` | 🔑 יוצרת בלבד | עריכה (רק ממתין/נדחה) | 200 `PollDetails` |
-| DELETE | `/polls/:id` | 🔑 יוצרת בלבד | מחיקה (רק ממתין/נדחה) | 204 (בלי תוכן) |
+| DELETE | `/polls/:id` | 🔑 יוצרת (כל עוד אין הצבעות) או 👑 מנהל (תמיד) | מחיקה | 204 (בלי תוכן) |
 | POST | `/polls/:id/close` | 🔑 יוצרת בלבד | סגירה מוקדמת | 200 `PollDetails` |
 | POST | `/polls/:id/votes` | 🔑 | הצבעה | 201 `PollDetails` מעודכן |
 | GET | `/polls/:id/results` | 🔑 | תוצאות | 200 `PollResults` |
 | GET | `/admin/polls` | 👑 | כל הסקרים לניהול | 200 רשימה |
-| POST | `/admin/polls/:id/approve` | 👑 | אישור | 200 `PollDetails` |
-| POST | `/admin/polls/:id/reject` | 👑 | דחייה | 200 `PollDetails` |
+| POST | `/admin/polls/:id/approve` | 👑 | אישור (מממתין או מנדחה) | 200 `PollDetails` |
+| POST | `/admin/polls/:id/reject` | 👑 | דחייה (מממתין או ממאושר), סיבה חובה | 200 `PollDetails` |
 | PATCH | `/admin/polls/:id/visibility` | 👑 | הסתרה/החזרה | 200 `PollDetails` |
 
 💡 ב-`GET /polls` וב-`GET /polls/:id` כדאי **לשלוח Token אם יש** - כך יגיעו `hasVoted`, `myChoices` ו-`permissions` נכונים.
@@ -216,7 +243,7 @@ Content-Type: application/json
 
 ### זרימה מומלצת במסך "פרטי סקר"
 1. `GET /polls/:id` (עם Token אם יש).
-2. אם `permissions.canVote` → להציג את האפשרויות לבחירה (כפתורי רדיו אם `allowMultiple=false`, תיבות סימון אם `true`) וכפתור "הצבעה".
+2. אם `permissions.canVote` → להציג כל שאלה עם האפשרויות שלה (כפתורי רדיו אם `allowMultiple=false` בשאלה, תיבות סימון אם `true`) וכפתור "הצבעה" אחד לכל הסקר. כדאי לאפשר שליחה רק אחרי שענו על כל השאלות.
 3. אחרי הצבעה מוצלחת (201) - התשובה כבר כוללת את הסקר המעודכן (`canSeeResults: true`) ← לקרוא ל-`GET /polls/:id/results` ולהציג דיאגרמה.
 4. אם `permissions.canSeeResults` כבר בהתחלה → להציג ישר את הדיאגרמה.
 5. אורח (בלי Token) → להציג "התחברי כדי להצביע ולראות תוצאות".
@@ -247,9 +274,12 @@ Content-Type: application/json
   "title": "איזה סרט נראה בשישי?",
   "description": "נפגשים אצל דנה ב-20:00",
   "category": "ENTERTAINMENT",
-  "allowMultiple": false,
   "closesAt": "2026-12-31T20:00:00.000Z",
-  "options": ["קומדיה", "אקשן", "דרמה"]
+  "questions": [
+    { "text": "איזה סרט נראה?", "options": ["קומדיה", "אקשן", "דרמה"] },
+    { "text": "באיזה סטייל לבוש באים?", "options": ["פיג׳מות", "יומיומי"] },
+    { "text": "באיזו שעה נפגשים?", "allowMultiple": true, "options": ["19:00", "20:00", "21:00"] }
+  ]
 }
 ```
 | שדה | חובה | כללים |
@@ -257,11 +287,14 @@ Content-Type: application/json
 | `title` | ✅ | 5-150 תווים |
 | `description` | | עד 500 תווים (אפשר להשמיט או לשלוח `null`) |
 | `category` | ✅ | אחד מערכי הקטגוריות |
-| `allowMultiple` | | `true`/`false` (ברירת מחדל `false`) |
 | `closesAt` | ✅ | תאריך ISO בעתיד, עד שנה מהיום |
-| `options` | ✅ | מערך של 2-6 טקסטים שונים, כל אחד 1-100 תווים. הסדר נשמר |
+| `questions` | ✅ | מערך של 1-10 שאלות. הסדר נשמר |
+| `questions[].text` | ✅ | 2-150 תווים |
+| `questions[].allowMultiple` | | `true`/`false` (ברירת מחדל `false`) |
+| `questions[].options` | ✅ | מערך של 2-6 טקסטים שונים, כל אחד 1-100 תווים. הסדר נשמר |
 
-- בעריכה שולחים **את כל השדות** (כמו ביצירה). האפשרויות מוחלפות ברשימה החדשה.
+- סקר עם שאלה אחת? שולחים `questions` עם שאלה אחת.
+- בעריכה שולחים **את כל השדות** (כמו ביצירה). השאלות והאפשרויות מוחלפות ברשימה החדשה.
 - אחרי עריכה הסקר חוזר ל-`PENDING` וסיבת הדחייה נמחקת.
 - משתמשת רגילה: הסקר נוצר כ-`PENDING` → כדאי להציג "הסקר נשלח לאישור המנהל". מנהל: נוצר כ-`APPROVED`.
 
@@ -269,13 +302,15 @@ Content-Type: application/json
 ```json
 { "optionIds": [11] }
 ```
-בבחירה מרובה: `{ "optionIds": [11, 13] }`. שולחים את ה-`id` של האפשרויות (מ-`options`), לא את הטקסט.
+שולחים את ה-`id` של האפשרויות שנבחרו **מכל השאלות יחד**, לא את הטקסט. למשל בסקר עם שתי שאלות: `{ "optionIds": [11, 13, 14] }`.
+- חובה לענות על כל שאלה - אחרת 400 עם הודעה שאומרת על איזו שאלה לא ענו.
+- בשאלה רגילה בדיוק אפשרות אחת; בשאלה עם `allowMultiple` אחת או יותר.
 
 ### דחייה - `POST /admin/polls/:id/reject`
 ```json
 { "reason": "השאלה לא ברורה, נא לנסח מחדש" }
 ```
-`reason` לא חובה, עד 300 תווים. אפשר לשלוח גוף ריק.
+`reason` חובה, 1 עד 300 תווים. אפשר לדחות סקר ממתין וגם סקר שאושר (ההצבעות נשמרות, והסקר מפסיק להיות גלוי).
 
 ### הסתרה - `PATCH /admin/polls/:id/visibility`
 ```json
@@ -294,18 +329,18 @@ Content-Type: application/json
     "message": "הנתונים שנשלחו אינם תקינים",
     "details": [
       { "field": "title", "message": "הכותרת חייבת להכיל לפחות 5 תווים" },
-      { "field": "options", "message": "יש להזין לפחות 2 אפשרויות תשובה" }
+      { "field": "questions.0.options", "message": "יש להזין לפחות 2 אפשרויות תשובה" }
     ]
   }
 }
 ```
 - `message` - בעברית, אפשר להציג ישירות למשתמשת.
-- `details` (רק בשגיאת ולידציה) - `field` הוא שם השדה בטופס, כך שאפשר להציג כל שגיאה מתחת לשדה שלה. באפשרויות: `options.1` = האפשרות השנייה.
+- `details` (רק בשגיאת ולידציה) - `field` הוא שם השדה בטופס, כך שאפשר להציג כל שגיאה מתחת לשדה שלה. בשאלות: `questions.1.text` = הטקסט של השאלה השנייה, `questions.0.options.2` = האפשרות השלישית בשאלה הראשונה.
 
 | קוד HTTP | `error.code` | מתי | מה לעשות ב-React |
 |---|---|---|---|
 | 400 | `VALIDATION_ERROR` | שדה חסר / לא תקין | להציג את `details` ליד השדות |
-| 400 | `BAD_REQUEST` | למשל: יותר מבחירה אחת בסקר רגיל | להציג `message` |
+| 400 | `BAD_REQUEST` | למשל: לא ענו על אחת השאלות, או יותר מבחירה אחת בשאלה רגילה | להציג `message` |
 | 400 | `INVALID_JSON` | גוף בקשה לא תקין | לבדוק את הקוד ששולח |
 | 401 | `UNAUTHORIZED` | אין Token | להעביר למסך התחברות |
 | 401 | `INVALID_TOKEN` / `TOKEN_EXPIRED` | Token לא תקין / פג תוקף | למחוק Token ולהעביר להתחברות |
@@ -330,7 +365,9 @@ Content-Type: application/json
 |---|---|---|---|
 | צפייה בסקרים מאושרים | ✅ | ✅ | ✅ |
 | יצירת סקר | ❌ | ✅ (ממתין לאישור) | ✅ (מאושר מיד) |
-| עריכה/מחיקה של סקר **שלי** לפני אישור | ❌ | ✅ | ✅ |
+| עריכה של סקר **שלי** לפני אישור (ובלי הצבעות) | ❌ | ✅ | ✅ |
+| מחיקה של סקר **שלי** כל עוד אין הצבעות | ❌ | ✅ | ✅ |
+| מחיקה של כל סקר, כולל מאושר עם הצבעות | ❌ | ❌ | ✅ |
 | סגירה מוקדמת של סקר **שלי** | ❌ | ✅ | ✅ |
 | הצבעה (פעם אחת, סופית) | ❌ | ✅ | ✅ |
 | צפייה בתוצאות (אחרי הצבעה או סגירה) | ❌ | ✅ | ✅ |

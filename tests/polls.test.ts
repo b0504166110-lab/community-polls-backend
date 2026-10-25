@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { api, createPoll, createUser, futureDate, prisma, resetDb, validPollBody } from './helpers';
+import { api, createPoll, createUser, futureDate, prisma, questionBody, resetDb, validPollBody } from './helpers';
 
 beforeEach(resetDb);
 
@@ -18,7 +18,35 @@ describe('יצירת סקר - POST /api/polls', () => {
       creator: { id: user.id },
       permissions: { canEdit: true, canDelete: true, canVote: false },
     });
-    expect(res.body.options.map((o: { text: string }) => o.text)).toEqual(['קומדיה', 'אקשן', 'דרמה']);
+    expect(res.body.questionCount).toBe(1);
+    expect(res.body.questions[0]).toMatchObject({ text: 'איזה סרט נראה?', allowMultiple: false, position: 1 });
+    expect(res.body.questions[0].options.map((o: { text: string }) => o.text)).toEqual(['קומדיה', 'אקשן', 'דרמה']);
+  });
+
+  it('סקר עם כמה שאלות - כל שאלה עם האפשרויות שלה, לפי הסדר', async () => {
+    const { auth } = await createUser();
+    const res = await api()
+      .post('/api/polls')
+      .set('Authorization', auth)
+      .send(
+        validPollBody({
+          title: 'ערב סרט אצל דנה',
+          questions: [
+            questionBody(),
+            questionBody({ text: 'באיזה סטייל לבוש באים?', options: ['פיג׳מות', 'יומיומי'] }),
+            questionBody({ text: 'באיזו שעה נפגשים?', allowMultiple: true, options: ['19:00', '20:00', '21:00'] }),
+          ],
+        }),
+      );
+
+    expect(res.status).toBe(201);
+    expect(res.body.questionCount).toBe(3);
+    expect(res.body.questions.map((q: { text: string; allowMultiple: boolean }) => [q.text, q.allowMultiple])).toEqual([
+      ['איזה סרט נראה?', false],
+      ['באיזה סטייל לבוש באים?', false],
+      ['באיזו שעה נפגשים?', true],
+    ]);
+    expect(res.body.questions[1].options.map((o: { text: string }) => o.text)).toEqual(['פיג׳מות', 'יומיומי']);
   });
 
   it('סקר של מנהל מאושר אוטומטית', async () => {
@@ -52,11 +80,14 @@ describe('יצירת סקר - POST /api/polls', () => {
     ['תאריך סגירה בעבר', { closesAt: '2020-01-01T00:00:00.000Z' }, 'closesAt'],
     ['תאריך סגירה מעל שנה', { closesAt: futureDate(400) }, 'closesAt'],
     ['תאריך לא תקין', { closesAt: 'מחר' }, 'closesAt'],
-    ['אפשרות אחת בלבד', { options: ['רק אחת'] }, 'options'],
-    ['יותר מ-6 אפשרויות', { options: ['1', '2', '3', '4', '5', '6', '7'] }, 'options'],
-    ['אפשרויות כפולות', { options: ['כן', 'כן'] }, 'options'],
-    ['אפשרות ריקה', { options: ['כן', '   '] }, 'options.1'],
-    ['allowMultiple לא בוליאני', { allowMultiple: 'yes' }, 'allowMultiple'],
+    ['אפשרות אחת בלבד', { questions: [questionBody({ options: ['רק אחת'] })] }, 'questions.0.options'],
+    ['יותר מ-6 אפשרויות', { questions: [questionBody({ options: ['1', '2', '3', '4', '5', '6', '7'] })] }, 'questions.0.options'],
+    ['אפשרויות כפולות', { questions: [questionBody({ options: ['כן', 'כן'] })] }, 'questions.0.options'],
+    ['אפשרות ריקה', { questions: [questionBody({ options: ['כן', '   '] })] }, 'questions.0.options.1'],
+    ['allowMultiple לא בוליאני', { questions: [questionBody({ allowMultiple: 'yes' })] }, 'questions.0.allowMultiple'],
+    ['שאלה ריקה', { questions: [questionBody(), questionBody({ text: ' ' })] }, 'questions.1.text'],
+    ['בלי שאלות', { questions: [] }, 'questions'],
+    ['יותר מ-10 שאלות', { questions: Array.from({ length: 11 }, () => questionBody()) }, 'questions'],
   ])('Validation: %s - 400', async (_name, override, field) => {
     const { auth } = await createUser();
     const res = await api().post('/api/polls').set('Authorization', auth).send(validPollBody(override));
@@ -70,7 +101,7 @@ describe('יצירת סקר - POST /api/polls', () => {
     const res = await api().post('/api/polls').set('Authorization', auth).send({});
     expect(res.status).toBe(400);
     const fields = res.body.error.details.map((d: { field: string }) => d.field);
-    expect(fields).toEqual(expect.arrayContaining(['title', 'category', 'closesAt', 'options']));
+    expect(fields).toEqual(expect.arrayContaining(['title', 'category', 'closesAt', 'questions']));
   });
 });
 
@@ -219,36 +250,58 @@ describe('עריכה, מחיקה וסגירה', () => {
     const res = await api()
       .put(`/api/polls/${poll.id}`)
       .set('Authorization', owner.auth)
-      .send(validPollBody({ title: 'כותרת חדשה וברורה', options: ['כן', 'לא'] }));
+      .send(
+        validPollBody({
+          title: 'כותרת חדשה וברורה',
+          questions: [questionBody({ text: 'מגיעים?', options: ['כן', 'לא'] }), questionBody({ text: 'מביאים משהו?', options: ['שתייה', 'נשנושים'] })],
+        }),
+      );
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ title: 'כותרת חדשה וברורה', status: 'PENDING', rejectionReason: null });
-    expect(res.body.options.map((o: { text: string }) => o.text)).toEqual(['כן', 'לא']);
-    expect(await prisma.pollOption.count({ where: { pollId: poll.id } })).toBe(2);
+    expect(res.body.questions.map((q: { text: string }) => q.text)).toEqual(['מגיעים?', 'מביאים משהו?']);
+    expect(res.body.questions[0].options.map((o: { text: string }) => o.text)).toEqual(['כן', 'לא']);
+    expect(await prisma.pollQuestion.count({ where: { pollId: poll.id } })).toBe(2);
+    expect(await prisma.pollOption.count({ where: { question: { pollId: poll.id } } })).toBe(4);
   });
 
-  it('אי אפשר לערוך או למחוק סקר שאושר - 409', async () => {
+  it('אי אפשר לערוך סקר שאושר - 409', async () => {
     const owner = await createUser();
     const poll = await createPoll(owner.user.id);
     const edit = await api().put(`/api/polls/${poll.id}`).set('Authorization', owner.auth).send(validPollBody());
     expect(edit.status).toBe(409);
     expect(edit.body.error.code).toBe('POLL_LOCKED');
-    const del = await api().delete(`/api/polls/${poll.id}`).set('Authorization', owner.auth);
+  });
+
+  it('היוצר מוחק סקר מאושר שאין בו הצבעות; עם הצבעות - 409', async () => {
+    const owner = await createUser();
+    const empty = await createPoll(owner.user.id);
+    expect((await api().delete(`/api/polls/${empty.id}`).set('Authorization', owner.auth)).status).toBe(204);
+
+    const voted = await createPoll(owner.user.id);
+    await prisma.vote.create({ data: { pollId: voted.id, userId: owner.user.id } });
+    const del = await api().delete(`/api/polls/${voted.id}`).set('Authorization', owner.auth);
     expect(del.status).toBe(409);
+    expect(del.body.error.code).toBe('POLL_HAS_VOTES');
     expect(await prisma.poll.count()).toBe(1);
   });
 
   it('משתמש אחר לא יכול לערוך, למחוק או לסגור סקר מאושר - 403', async () => {
     const owner = await createUser();
     const other = await createUser();
-    const admin = await createUser('ADMIN');
     const poll = await createPoll(owner.user.id);
 
-    for (const who of [other, admin]) {
-      expect((await api().put(`/api/polls/${poll.id}`).set('Authorization', who.auth).send(validPollBody())).status).toBe(403);
-      expect((await api().delete(`/api/polls/${poll.id}`).set('Authorization', who.auth)).status).toBe(403);
-      expect((await api().post(`/api/polls/${poll.id}/close`).set('Authorization', who.auth)).status).toBe(403);
-    }
+    expect((await api().put(`/api/polls/${poll.id}`).set('Authorization', other.auth).send(validPollBody())).status).toBe(403);
+    expect((await api().delete(`/api/polls/${poll.id}`).set('Authorization', other.auth)).status).toBe(403);
+    expect((await api().post(`/api/polls/${poll.id}/close`).set('Authorization', other.auth)).status).toBe(403);
+  });
+
+  it('מנהל שאינו היוצר לא יכול לערוך או לסגור סקר - 403', async () => {
+    const owner = await createUser();
+    const admin = await createUser('ADMIN');
+    const poll = await createPoll(owner.user.id);
+    expect((await api().put(`/api/polls/${poll.id}`).set('Authorization', admin.auth).send(validPollBody())).status).toBe(403);
+    expect((await api().post(`/api/polls/${poll.id}/close`).set('Authorization', admin.auth)).status).toBe(403);
   });
 
   it('משתמש אחר מנסה לערוך סקר ממתין שלא שלו - 404 (לא חושפים שהוא קיים)', async () => {
@@ -265,6 +318,7 @@ describe('עריכה, מחיקה וסגירה', () => {
     const res = await api().delete(`/api/polls/${poll.id}`).set('Authorization', owner.auth);
     expect(res.status).toBe(204);
     expect(await prisma.poll.count()).toBe(0);
+    expect(await prisma.pollQuestion.count()).toBe(0);
     expect(await prisma.pollOption.count()).toBe(0);
   });
 

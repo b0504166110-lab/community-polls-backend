@@ -1,5 +1,5 @@
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { openApiSpec } from '../src/docs/openapi';
@@ -138,6 +138,7 @@ describe('Prisma ומסד הנתונים', () => {
 
   it('אין Migrations שלא הוחלו (הסכמה תואמת)', async () => {
     const rows = await prisma.$queryRaw<{ count: bigint }[]>`SELECT COUNT(*)::bigint AS count FROM "_prisma_migrations" WHERE finished_at IS NOT NULL`;
-    expect(Number(rows[0]!.count)).toBe(2);
+    const migrationDirs = readdirSync(join(__dirname, '../prisma/migrations'), { withFileTypes: true }).filter((d) => d.isDirectory());
+    expect(Number(rows[0]!.count)).toBe(migrationDirs.length);
   });
 });

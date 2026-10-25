@@ -62,7 +62,7 @@
 רענני את עמוד ה-Repository. אמורים להופיע בשורש:
 - תיקיות: `docs`, `prisma`, `scripts`, `src`, `tests`
 - קבצים: `package.json`, `package-lock.json`, `render.yaml`, `README.md`, `tsconfig.json` ועוד
-- היכנסי ל-`prisma` ← `migrations` - צריכות להיות שתי תיקיות.
+- היכנסי ל-`prisma` ← `migrations` - צריכות להיות שלוש תיקיות.
 
 ✅ אם אין קובץ בשם `.env` (בלי `.example`) - מצוין, כך צריך.
 
@@ -228,7 +228,7 @@
 |---|---|---|
 | **Build Failed** | ב-Logs מופיע `npm ERR!` או `error TS` | ודאי שה-Build Command הוא בדיוק `npm ci --include=dev && npm run build`, ושהקבצים `package.json` ו-`package-lock.json` נמצאים **בשורש** ה-Repository ולא בתוך תת-תיקייה. אם הם בתת-תיקייה - כתבי את שמה ב-**Root Directory**. |
 | **DATABASE_URL שגוי** | `P1001: Can't reach database server` או `P1000: Authentication failed` | העתיקי מחדש את הכתובת מ-Neon (כפתור **Connect**), ודאי שאין רווחים או מרכאות מיותרות, שיש `sslmode=require`, ושהוספת `&connect_timeout=15`. |
-| **בעיית Prisma / Migrations** | `P3009` / `P3018` / `migrate deploy` נכשל | ודאי שכיבית את **Connection pooling** ב-Neon (בכתובת אסור שיהיה `-pooler`). ודאי שתיקיית `prisma/migrations` הועלתה ל-GitHub עם שתי התיקיות שבתוכה. |
+| **בעיית Prisma / Migrations** | `P3009` / `P3018` / `migrate deploy` נכשל | ודאי שכיבית את **Connection pooling** ב-Neon (בכתובת אסור שיהיה `-pooler`). ודאי שתיקיית `prisma/migrations` הועלתה ל-GitHub עם שלוש התיקיות שבתוכה. |
 | **JWT_SECRET חסר** | ב-Logs: `JWT_SECRET חסר` או `JWT_SECRET חייב להכיל לפחות 32 תווים` | הוסיפי ב-Render ← **Environment** משתנה `JWT_SECRET` עם מחרוזת אקראית ארוכה (40+ תווים). אסור להשתמש בערך שמתחיל ב-`change-me`. שמרי ← Render יפעיל מחדש. |
 | **שגיאת CORS** | בדפדפן של אתר ה-React (F12 ← Console): `blocked by CORS policy` | עדכני את `CORS_ORIGIN` ב-Render לכתובת **המדויקת** של אתר ה-React - כולל `https://`, בלי `/` בסוף. למשל `https://my-polls.netlify.app`. |
 | **401 Unauthorized** | `UNAUTHORIZED` / `INVALID_TOKEN` / `TOKEN_EXPIRED` | לא נשלח Token, הוא הודבק לא נכון, או שפג תוקפו (אחרי שעתיים). התחברי מחדש וקבלי Token חדש. ב-Swagger: הדביקי **בלי** המילה Bearer. |

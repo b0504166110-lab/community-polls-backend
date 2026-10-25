@@ -47,7 +47,6 @@ model Poll {
   title           String       @db.VarChar(150)
   description     String?      @db.VarChar(500)
   category        PollCategory
-  allowMultiple   Boolean      @default(false)
   closesAt        DateTime
   status          PollStatus   @default(PENDING)
   rejectionReason String?      @db.VarChar(300)
@@ -57,9 +56,9 @@ model Poll {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  creator User         @relation(fields: [creatorId], references: [id], onDelete: Restrict)
-  options PollOption[]
-  votes   Vote[]
+  creator   User           @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  questions PollQuestion[]
+  votes     Vote[]
 
   @@index([status, isHidden])
   @@index([creatorId])
@@ -67,17 +66,31 @@ model Poll {
   @@index([closesAt])
 }
 
-model PollOption {
-  id       Int    @id @default(autoincrement())
-  pollId   Int
-  text     String @db.VarChar(100)
-  position Int
+// שאלה בתוך סקר. לכל סקר שאלה אחת או יותר, ולכל שאלה האפשרויות שלה
+model PollQuestion {
+  id            Int     @id @default(autoincrement())
+  pollId        Int
+  text          String  @db.VarChar(150)
+  allowMultiple Boolean @default(false)
+  position      Int
 
   poll    Poll         @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  choices VoteChoice[]
+  options PollOption[]
 
   @@unique([pollId, position])
-  @@unique([pollId, text])
+}
+
+model PollOption {
+  id         Int    @id @default(autoincrement())
+  questionId Int
+  text       String @db.VarChar(100)
+  position   Int
+
+  question PollQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  choices  VoteChoice[]
+
+  @@unique([questionId, position])
+  @@unique([questionId, text])
 }
 
 // הצבעה אחת של משתמש אחד בסקר אחד (ההגבלה הייחודית מונעת הצבעה כפולה)
@@ -95,7 +108,7 @@ model Vote {
   @@index([userId])
 }
 
-// האפשרויות שנבחרו בהצבעה (אחת, או כמה בסקר עם בחירה מרובה)
+// האפשרויות שנבחרו בהצבעה (לפחות אחת לכל שאלה, וכמה רק בשאלה עם בחירה מרובה)
 model VoteChoice {
   id       Int @id @default(autoincrement())
   voteId   Int

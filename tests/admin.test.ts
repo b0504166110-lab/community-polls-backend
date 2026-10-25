@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { api, createPoll, createUser, resetDb } from './helpers';
+import { api, createPoll, createUser, prisma, resetDb } from './helpers';
 
 beforeEach(resetDb);
 
@@ -7,7 +7,7 @@ describe('הרשאות מנהל', () => {
   const adminRequests = (id: number) => [
     { method: 'get' as const, url: '/api/admin/polls' },
     { method: 'post' as const, url: `/api/admin/polls/${id}/approve` },
-    { method: 'post' as const, url: `/api/admin/polls/${id}/reject` },
+    { method: 'post' as const, url: `/api/admin/polls/${id}/reject`, body: { reason: 'סיבה' } },
     { method: 'patch' as const, url: `/api/admin/polls/${id}/visibility`, body: { isHidden: true } },
   ];
 
@@ -93,14 +93,43 @@ describe('ניהול סקרים', () => {
     expect(asOwner.body.permissions.canEdit).toBe(true);
   });
 
-  it('דחייה בלי סיבה עובדת; סיבה ארוכה מדי - 400', async () => {
+  it('דחייה בלי סיבה, עם סיבה ריקה או ארוכה מדי - 400', async () => {
     const admin = await createUser('ADMIN');
     const user = await createUser();
-    const p1 = await createPoll(user.user.id, { status: 'PENDING' });
-    const p2 = await createPoll(user.user.id, { status: 'PENDING' });
-    expect((await api().post(`/api/admin/polls/${p1.id}/reject`).set('Authorization', admin.auth)).status).toBe(200);
-    const long = await api().post(`/api/admin/polls/${p2.id}/reject`).set('Authorization', admin.auth).send({ reason: 'א'.repeat(301) });
-    expect(long.status).toBe(400);
+    const poll = await createPoll(user.user.id, { status: 'PENDING' });
+    const url = `/api/admin/polls/${poll.id}/reject`;
+    expect((await api().post(url).set('Authorization', admin.auth)).status).toBe(400);
+    expect((await api().post(url).set('Authorization', admin.auth).send({ reason: '   ' })).status).toBe(400);
+    expect((await api().post(url).set('Authorization', admin.auth).send({ reason: 'א'.repeat(301) })).status).toBe(400);
+  });
+
+  it('אפשר לדחות סקר שאושר, ולאשר סקר שנדחה - ההחלטה הפיכה', async () => {
+    const admin = await createUser('ADMIN');
+    const user = await createUser();
+    const poll = await createPoll(user.user.id);
+
+    const reject = await api().post(`/api/admin/polls/${poll.id}/reject`).set('Authorization', admin.auth).send({ reason: 'נדחה בדיעבד' });
+    expect(reject.status).toBe(200);
+    expect(reject.body.status).toBe('REJECTED');
+    expect((await api().get('/api/polls')).body.total).toBe(0);
+    expect((await api().post(`/api/admin/polls/${poll.id}/reject`).set('Authorization', admin.auth).send({ reason: 'שוב' })).status).toBe(409);
+
+    const approve = await api().post(`/api/admin/polls/${poll.id}/approve`).set('Authorization', admin.auth);
+    expect(approve.status).toBe(200);
+    expect(approve.body).toMatchObject({ status: 'APPROVED', rejectionReason: null });
+  });
+
+  it('מנהל מוחק כל סקר, גם מאושר עם הצבעות', async () => {
+    const admin = await createUser('ADMIN');
+    const user = await createUser();
+    const poll = await createPoll(user.user.id);
+    const vote = await prisma.vote.create({ data: { pollId: poll.id, userId: user.user.id } });
+    await prisma.voteChoice.create({ data: { voteId: vote.id, optionId: poll.options[0]!.id } });
+
+    const res = await api().delete(`/api/polls/${poll.id}`).set('Authorization', admin.auth);
+    expect(res.status).toBe(204);
+    expect(await prisma.poll.count()).toBe(0);
+    expect(await prisma.vote.count()).toBe(0);
   });
 
   it('הסתרה והחזרה לתצוגה', async () => {

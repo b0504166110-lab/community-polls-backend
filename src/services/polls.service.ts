@@ -5,11 +5,13 @@ import { AppError } from '../utils/AppError';
 import { paginate } from '../utils/pagination';
 import type { ListPollsQuery, PollInput } from '../validation/poll.schemas';
 import {
+  canDeletePoll,
   canView,
   isEditable,
   isOpen,
   isOwner,
   pollInclude,
+  questionsInclude,
   toPollDetails,
   toPollSummary,
 } from './pollView';
@@ -33,6 +35,7 @@ export function searchWhere(search?: string): Prisma.PollWhereInput | undefined 
     OR: [
       { title: { contains: search, mode: 'insensitive' } },
       { description: { contains: search, mode: 'insensitive' } },
+      { questions: { some: { text: { contains: search, mode: 'insensitive' } } } },
     ],
   };
 }
@@ -87,7 +90,7 @@ export async function listPolls(query: ListPollsQuery, viewer?: AuthUser) {
 export async function findViewablePoll(id: number, viewer?: AuthUser) {
   const poll = await prisma.poll.findUnique({
     where: { id },
-    include: { ...pollInclude(viewer?.id), options: true },
+    include: { ...pollInclude(viewer?.id), questions: questionsInclude },
   });
   if (!poll || !canView(poll, viewer)) {
     throw AppError.notFound('הסקר לא נמצא');
@@ -100,8 +103,13 @@ export async function getPoll(id: number, viewer?: AuthUser) {
   return toPollDetails(poll, viewer);
 }
 
-function optionsData(options: string[]) {
-  return options.map((text, index) => ({ text, position: index + 1 }));
+function questionsData(questions: PollInput['questions']) {
+  return questions.map((q, qIndex) => ({
+    text: q.text,
+    allowMultiple: q.allowMultiple,
+    position: qIndex + 1,
+    options: { create: q.options.map((text, index) => ({ text, position: index + 1 })) },
+  }));
 }
 
 export async function createPoll(input: PollInput, user: AuthUser) {
@@ -110,47 +118,46 @@ export async function createPoll(input: PollInput, user: AuthUser) {
       title: input.title,
       description: input.description,
       category: input.category,
-      allowMultiple: input.allowMultiple,
       closesAt: input.closesAt,
       // סקר של מנהל מאושר אוטומטית; סקר של משתמש ממתין לאישור
       status: user.role === 'ADMIN' ? 'APPROVED' : 'PENDING',
       creatorId: user.id,
-      options: { create: optionsData(input.options) },
+      questions: { create: questionsData(input.questions) },
     },
   });
   return getPoll(poll.id, user);
 }
 
-// בדיקה משותפת לעריכה ולמחיקה: רק היוצר, ורק לפני אישור
-async function findOwnEditablePoll(id: number, user: AuthUser) {
-  const poll = await findViewablePoll(id, user);
+function requireOwner(poll: Awaited<ReturnType<typeof findViewablePoll>>, user: AuthUser) {
   if (!isOwner(poll, user)) {
     throw AppError.forbidden('רק יוצר הסקר יכול לבצע פעולה זו');
   }
-  if (!isEditable(poll)) {
-    throw AppError.conflict('POLL_LOCKED', 'אי אפשר לשנות או למחוק סקר שכבר אושר');
-  }
-  return poll;
 }
 
 export async function updatePoll(id: number, input: PollInput, user: AuthUser) {
-  await findOwnEditablePoll(id, user);
+  const poll = await findViewablePoll(id, user);
+  requireOwner(poll, user);
+  if (!isEditable(poll)) {
+    throw AppError.conflict('POLL_LOCKED', 'אי אפשר לערוך סקר שכבר אושר');
+  }
+  if (poll._count.votes > 0) {
+    throw AppError.conflict('POLL_HAS_VOTES', 'אי אפשר לערוך סקר שכבר הצביעו בו');
+  }
 
-  // לסקר שלא אושר אין הצבעות, ולכן אפשר להחליף את האפשרויות בבטחה
+  // לסקר שלא אושר אין הצבעות, ולכן אפשר להחליף את השאלות והאפשרויות בבטחה
   await prisma.$transaction([
-    prisma.pollOption.deleteMany({ where: { pollId: id } }),
+    prisma.pollQuestion.deleteMany({ where: { pollId: id } }),
     prisma.poll.update({
       where: { id },
       data: {
         title: input.title,
         description: input.description,
         category: input.category,
-        allowMultiple: input.allowMultiple,
         closesAt: input.closesAt,
         // אחרי עריכה הסקר חוזר לאישור המנהל
         status: 'PENDING',
         rejectionReason: null,
-        options: { create: optionsData(input.options) },
+        questions: { create: questionsData(input.questions) },
       },
     }),
   ]);
@@ -158,8 +165,18 @@ export async function updatePoll(id: number, input: PollInput, user: AuthUser) {
 }
 
 export async function deletePoll(id: number, user: AuthUser) {
-  await findOwnEditablePoll(id, user);
-  await prisma.poll.delete({ where: { id } });
+  const poll = await findViewablePoll(id, user);
+  if (user.role !== 'ADMIN') {
+    requireOwner(poll, user);
+    if (!canDeletePoll(poll, poll._count.votes, user)) {
+      throw AppError.conflict('POLL_HAS_VOTES', 'אי אפשר למחוק סקר שכבר הצביעו בו');
+    }
+  }
+  // הצבעות חוסמות מחיקת סקר במסד, לכן מוחקים אותן קודם (הבחירות נמחקות איתן)
+  await prisma.$transaction([
+    prisma.vote.deleteMany({ where: { pollId: id } }),
+    prisma.poll.delete({ where: { id } }),
+  ]);
 }
 
 export async function closePoll(id: number, user: AuthUser) {

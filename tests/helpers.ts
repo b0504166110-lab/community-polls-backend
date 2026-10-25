@@ -15,7 +15,7 @@ const DAY = 24 * 60 * 60 * 1000;
 // מוחק את כל הנתונים במסד הבדיקות (רק במסד הבדיקות - ראי testDatabase.ts)
 export async function resetDb() {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "VoteChoice", "Vote", "PollOption", "Poll", "User" RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE "VoteChoice", "Vote", "PollOption", "PollQuestion", "Poll", "User" RESTART IDENTITY CASCADE',
   );
 }
 
@@ -47,10 +47,13 @@ export async function createPoll(
     closedEarlyAt: Date | null;
     rejectionReason: string | null;
     options: string[];
+    questions: { text: string; allowMultiple?: boolean; options: string[] }[];
   }> = {},
 ) {
-  const { options = ['אפשרות א', 'אפשרות ב', 'אפשרות ג'], ...data } = overrides;
-  return prisma.poll.create({
+  // ברירת המחדל: סקר עם שאלה אחת. options ו-allowMultiple מתייחסים לשאלה הזו
+  const { options = ['אפשרות א', 'אפשרות ב', 'אפשרות ג'], allowMultiple = false, questions, ...data } = overrides;
+  const questionList = questions ?? [{ text: 'שאלת בדיקה', allowMultiple, options }];
+  const poll = await prisma.poll.create({
     data: {
       title: 'סקר בדיקה לדוגמה',
       category: 'GENERAL',
@@ -58,10 +61,19 @@ export async function createPoll(
       status: 'APPROVED',
       ...data,
       creatorId,
-      options: { create: options.map((text, i) => ({ text, position: i + 1 })) },
+      questions: {
+        create: questionList.map((q, qi) => ({
+          text: q.text,
+          allowMultiple: q.allowMultiple ?? false,
+          position: qi + 1,
+          options: { create: q.options.map((text, i) => ({ text, position: i + 1 })) },
+        })),
+      },
     },
-    include: { options: { orderBy: { position: 'asc' } } },
+    include: { questions: { orderBy: { position: 'asc' }, include: { options: { orderBy: { position: 'asc' } } } } },
   });
+  // options - כל האפשרויות של כל השאלות לפי הסדר, לנוחות בבדיקות
+  return { ...poll, options: poll.questions.flatMap((q) => q.options) };
 }
 
 export function futureDate(days = 7) {
@@ -73,9 +85,12 @@ export function validPollBody(overrides: Record<string, unknown> = {}) {
     title: 'איזה סרט נראה בשישי?',
     description: 'נפגשים ב-20:00',
     category: 'ENTERTAINMENT',
-    allowMultiple: false,
     closesAt: futureDate(),
-    options: ['קומדיה', 'אקשן', 'דרמה'],
+    questions: [questionBody()],
     ...overrides,
   };
+}
+
+export function questionBody(overrides: Record<string, unknown> = {}) {
+  return { text: 'איזה סרט נראה?', allowMultiple: false, options: ['קומדיה', 'אקשן', 'דרמה'], ...overrides };
 }

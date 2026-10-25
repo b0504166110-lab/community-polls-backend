@@ -233,7 +233,6 @@
           "description",
           "category",
           "categoryLabel",
-          "allowMultiple",
           "closesAt",
           "closedEarlyAt",
           "status",
@@ -241,7 +240,7 @@
           "isOpen",
           "rejectionReason",
           "voterCount",
-          "optionCount",
+          "questionCount",
           "creator",
           "hasVoted",
           "createdAt",
@@ -267,10 +266,6 @@
           "categoryLabel": {
             "type": "string",
             "example": "בילויים"
-          },
-          "allowMultiple": {
-            "type": "boolean",
-            "description": "האם מותר לבחור כמה תשובות"
           },
           "closesAt": {
             "type": "string",
@@ -303,9 +298,10 @@
             "description": "מספר המצביעים",
             "example": 3
           },
-          "optionCount": {
+          "questionCount": {
             "type": "integer",
-            "example": 3
+            "description": "מספר השאלות בסקר",
+            "example": 2
           },
           "creator": {
             "$ref": "#/components/schemas/Creator"
@@ -346,6 +342,40 @@
           }
         }
       },
+      "PollQuestion": {
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "allowMultiple",
+          "position",
+          "options"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "text": {
+            "type": "string",
+            "example": "איזה סרט נראה?"
+          },
+          "allowMultiple": {
+            "type": "boolean",
+            "description": "האם מותר לבחור כמה תשובות בשאלה הזו"
+          },
+          "position": {
+            "type": "integer",
+            "example": 1
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PollOption"
+            }
+          }
+        }
+      },
       "PollPermissions": {
         "type": "object",
         "description": "מה המשתמש הנוכחי יכול לעשות - נוח להצגה/הסתרה של כפתורים",
@@ -382,15 +412,15 @@
           {
             "type": "object",
             "required": [
-              "options",
+              "questions",
               "myChoices",
               "permissions"
             ],
             "properties": {
-              "options": {
+              "questions": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PollOption"
+                  "$ref": "#/components/schemas/PollQuestion"
                 }
               },
               "myChoices": {
@@ -413,7 +443,7 @@
           "title",
           "category",
           "closesAt",
-          "options"
+          "questions"
         ],
         "properties": {
           "title": {
@@ -429,37 +459,78 @@
           "category": {
             "$ref": "#/components/schemas/PollCategory"
           },
-          "allowMultiple": {
-            "type": "boolean",
-            "default": false
-          },
           "closesAt": {
             "type": "string",
             "format": "date-time",
             "description": "בעתיד, ועד שנה מהיום (פורמט ISO)"
           },
-          "options": {
+          "questions": {
             "type": "array",
-            "minItems": 2,
-            "maxItems": 6,
-            "description": "2-6 אפשרויות שונות, כל אחת 1-100 תווים",
+            "minItems": 1,
+            "maxItems": 10,
+            "description": "1-10 שאלות. הסדר נשמר",
             "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "type": "object",
+              "required": [
+                "text",
+                "options"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 150
+                },
+                "allowMultiple": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "options": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 6,
+                  "description": "2-6 אפשרויות שונות, כל אחת 1-100 תווים",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              }
             }
           }
         },
         "example": {
-          "title": "איזה סרט נראה בשישי?",
-          "description": "נפגשים אצל דנה ב-20:00",
+          "title": "ערב סרט אצל דנה בשישי",
+          "description": "מביאים פופקורן",
           "category": "ENTERTAINMENT",
-          "allowMultiple": false,
           "closesAt": "2026-12-31T20:00:00.000Z",
-          "options": [
-            "קומדיה",
-            "אקשן",
-            "דרמה"
+          "questions": [
+            {
+              "text": "איזה סרט נראה?",
+              "allowMultiple": false,
+              "options": [
+                "קומדיה",
+                "אקשן",
+                "דרמה"
+              ]
+            },
+            {
+              "text": "באיזה סטייל לבוש באים?",
+              "options": [
+                "פיג׳מות",
+                "יומיומי"
+              ]
+            },
+            {
+              "text": "באיזו שעה נפגשים?",
+              "allowMultiple": true,
+              "options": [
+                "19:00",
+                "20:00",
+                "21:00"
+              ]
+            }
           ]
         }
       },
@@ -475,7 +546,7 @@
             "items": {
               "type": "integer"
             },
-            "description": "בסקר רגיל - בדיוק מזהה אחד. בסקר עם בחירה מרובה - אחד או יותר"
+            "description": "מזהי האפשרויות מכל השאלות יחד. חובה לענות על כל שאלה: בדיוק אפשרות אחת, או אחת ומעלה בשאלה עם allowMultiple"
           }
         },
         "example": {
@@ -489,11 +560,9 @@
         "required": [
           "pollId",
           "title",
-          "allowMultiple",
           "isOpen",
           "totalVoters",
-          "totalChoices",
-          "options",
+          "questions",
           "myChoices"
         ],
         "properties": {
@@ -503,9 +572,6 @@
           "title": {
             "type": "string"
           },
-          "allowMultiple": {
-            "type": "boolean"
-          },
           "isOpen": {
             "type": "boolean"
           },
@@ -513,19 +579,16 @@
             "type": "integer",
             "description": "מספר המצביעים"
           },
-          "totalChoices": {
-            "type": "integer",
-            "description": "סך כל הבחירות (בבחירה מרובה יכול להיות גדול ממספר המצביעים)"
-          },
-          "options": {
+          "questions": {
             "type": "array",
             "items": {
               "type": "object",
               "required": [
                 "id",
                 "text",
-                "count",
-                "percent"
+                "allowMultiple",
+                "totalChoices",
+                "options"
               ],
               "properties": {
                 "id": {
@@ -534,12 +597,39 @@
                 "text": {
                   "type": "string"
                 },
-                "count": {
-                  "type": "integer"
+                "allowMultiple": {
+                  "type": "boolean"
                 },
-                "percent": {
-                  "type": "number",
-                  "description": "אחוז מתוך המצביעים, ספרה אחת אחרי הנקודה"
+                "totalChoices": {
+                  "type": "integer",
+                  "description": "סך הבחירות בשאלה (בבחירה מרובה יכול להיות גדול ממספר המצביעים)"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "text",
+                      "count",
+                      "percent"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "count": {
+                        "type": "integer"
+                      },
+                      "percent": {
+                        "type": "number",
+                        "description": "אחוז מתוך המצביעים, ספרה אחת אחרי הנקודה"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -553,33 +643,61 @@
         },
         "example": {
           "pollId": 1,
-          "title": "איזה סרט נראה בשישי?",
-          "allowMultiple": false,
+          "title": "ערב סרט אצל דנה בשישי",
           "isOpen": true,
           "totalVoters": 3,
-          "totalChoices": 3,
-          "options": [
+          "questions": [
             {
               "id": 1,
-              "text": "קומדיה",
-              "count": 2,
-              "percent": 66.7
+              "text": "איזה סרט נראה?",
+              "allowMultiple": false,
+              "totalChoices": 3,
+              "options": [
+                {
+                  "id": 1,
+                  "text": "קומדיה",
+                  "count": 2,
+                  "percent": 66.7
+                },
+                {
+                  "id": 2,
+                  "text": "אקשן",
+                  "count": 1,
+                  "percent": 33.3
+                },
+                {
+                  "id": 3,
+                  "text": "דרמה",
+                  "count": 0,
+                  "percent": 0
+                }
+              ]
             },
             {
               "id": 2,
-              "text": "אקשן",
-              "count": 1,
-              "percent": 33.3
-            },
-            {
-              "id": 3,
-              "text": "דרמה",
-              "count": 0,
-              "percent": 0
+              "text": "באיזו שעה נפגשים?",
+              "allowMultiple": true,
+              "totalChoices": 4,
+              "options": [
+                {
+                  "id": 4,
+                  "text": "19:00",
+                  "count": 1,
+                  "percent": 33.3
+                },
+                {
+                  "id": 5,
+                  "text": "20:00",
+                  "count": 3,
+                  "percent": 100
+                }
+              ]
             }
           ],
           "myChoices": [
-            1
+            1,
+            4,
+            5
           ]
         }
       },
@@ -1046,7 +1164,7 @@
           {
             "name": "search",
             "in": "query",
-            "description": "חיפוש טקסט בכותרת ובתיאור (ללא תלות באותיות גדולות/קטנות)",
+            "description": "חיפוש טקסט בכותרת, בתיאור ובשאלות (ללא תלות באותיות גדולות/קטנות)",
             "schema": {
               "type": "string",
               "maxLength": 100
@@ -1194,15 +1312,36 @@
                 "$ref": "#/components/schemas/PollInput"
               },
               "example": {
-                "title": "איזה סרט נראה בשישי?",
-                "description": "נפגשים אצל דנה ב-20:00",
+                "title": "ערב סרט אצל דנה בשישי",
+                "description": "מביאים פופקורן",
                 "category": "ENTERTAINMENT",
-                "allowMultiple": false,
                 "closesAt": "2026-12-31T20:00:00.000Z",
-                "options": [
-                  "קומדיה",
-                  "אקשן",
-                  "דרמה"
+                "questions": [
+                  {
+                    "text": "איזה סרט נראה?",
+                    "allowMultiple": false,
+                    "options": [
+                      "קומדיה",
+                      "אקשן",
+                      "דרמה"
+                    ]
+                  },
+                  {
+                    "text": "באיזה סטייל לבוש באים?",
+                    "options": [
+                      "פיג׳מות",
+                      "יומיומי"
+                    ]
+                  },
+                  {
+                    "text": "באיזו שעה נפגשים?",
+                    "allowMultiple": true,
+                    "options": [
+                      "19:00",
+                      "20:00",
+                      "21:00"
+                    ]
+                  }
                 ]
               }
             }
@@ -1218,11 +1357,10 @@
                 },
                 "example": {
                   "id": 1,
-                  "title": "איזה סרט נראה בשישי?",
-                  "description": "נפגשים אצל דנה ב-20:00",
+                  "title": "ערב סרט אצל דנה בשישי",
+                  "description": "מביאים פופקורן",
                   "category": "ENTERTAINMENT",
                   "categoryLabel": "בילויים",
-                  "allowMultiple": false,
                   "closesAt": "2026-12-31T20:00:00.000Z",
                   "closedEarlyAt": null,
                   "status": "PENDING",
@@ -1230,7 +1368,7 @@
                   "isOpen": false,
                   "rejectionReason": null,
                   "voterCount": 0,
-                  "optionCount": 3,
+                  "questionCount": 2,
                   "creator": {
                     "id": 2,
                     "name": "נועה כהן"
@@ -1238,21 +1376,47 @@
                   "hasVoted": false,
                   "createdAt": "2026-10-01T10:00:00.000Z",
                   "updatedAt": "2026-10-01T10:00:00.000Z",
-                  "options": [
+                  "questions": [
                     {
                       "id": 1,
-                      "text": "קומדיה",
-                      "position": 1
+                      "text": "איזה סרט נראה?",
+                      "allowMultiple": false,
+                      "position": 1,
+                      "options": [
+                        {
+                          "id": 1,
+                          "text": "קומדיה",
+                          "position": 1
+                        },
+                        {
+                          "id": 2,
+                          "text": "אקשן",
+                          "position": 2
+                        },
+                        {
+                          "id": 3,
+                          "text": "דרמה",
+                          "position": 3
+                        }
+                      ]
                     },
                     {
                       "id": 2,
-                      "text": "אקשן",
-                      "position": 2
-                    },
-                    {
-                      "id": 3,
-                      "text": "דרמה",
-                      "position": 3
+                      "text": "באיזו שעה נפגשים?",
+                      "allowMultiple": true,
+                      "position": 2,
+                      "options": [
+                        {
+                          "id": 4,
+                          "text": "19:00",
+                          "position": 1
+                        },
+                        {
+                          "id": 5,
+                          "text": "20:00",
+                          "position": 2
+                        }
+                      ]
                     }
                   ],
                   "myChoices": [],
@@ -1344,11 +1508,10 @@
                 },
                 "example": {
                   "id": 1,
-                  "title": "איזה סרט נראה בשישי?",
-                  "description": "נפגשים אצל דנה ב-20:00",
+                  "title": "ערב סרט אצל דנה בשישי",
+                  "description": "מביאים פופקורן",
                   "category": "ENTERTAINMENT",
                   "categoryLabel": "בילויים",
-                  "allowMultiple": false,
                   "closesAt": "2026-12-31T20:00:00.000Z",
                   "closedEarlyAt": null,
                   "status": "APPROVED",
@@ -1356,7 +1519,7 @@
                   "isOpen": true,
                   "rejectionReason": null,
                   "voterCount": 3,
-                  "optionCount": 3,
+                  "questionCount": 2,
                   "creator": {
                     "id": 2,
                     "name": "נועה כהן"
@@ -1364,25 +1527,53 @@
                   "hasVoted": true,
                   "createdAt": "2026-10-01T10:00:00.000Z",
                   "updatedAt": "2026-10-01T10:00:00.000Z",
-                  "options": [
+                  "questions": [
                     {
                       "id": 1,
-                      "text": "קומדיה",
-                      "position": 1
+                      "text": "איזה סרט נראה?",
+                      "allowMultiple": false,
+                      "position": 1,
+                      "options": [
+                        {
+                          "id": 1,
+                          "text": "קומדיה",
+                          "position": 1
+                        },
+                        {
+                          "id": 2,
+                          "text": "אקשן",
+                          "position": 2
+                        },
+                        {
+                          "id": 3,
+                          "text": "דרמה",
+                          "position": 3
+                        }
+                      ]
                     },
                     {
                       "id": 2,
-                      "text": "אקשן",
-                      "position": 2
-                    },
-                    {
-                      "id": 3,
-                      "text": "דרמה",
-                      "position": 3
+                      "text": "באיזו שעה נפגשים?",
+                      "allowMultiple": true,
+                      "position": 2,
+                      "options": [
+                        {
+                          "id": 4,
+                          "text": "19:00",
+                          "position": 1
+                        },
+                        {
+                          "id": 5,
+                          "text": "20:00",
+                          "position": 2
+                        }
+                      ]
                     }
                   ],
                   "myChoices": [
-                    1
+                    1,
+                    4,
+                    5
                   ],
                   "permissions": {
                     "canVote": false,
@@ -1470,15 +1661,36 @@
                 "$ref": "#/components/schemas/PollInput"
               },
               "example": {
-                "title": "איזה סרט נראה בשישי?",
-                "description": "נפגשים אצל דנה ב-20:00",
+                "title": "ערב סרט אצל דנה בשישי",
+                "description": "מביאים פופקורן",
                 "category": "ENTERTAINMENT",
-                "allowMultiple": false,
                 "closesAt": "2026-12-31T20:00:00.000Z",
-                "options": [
-                  "קומדיה",
-                  "אקשן",
-                  "דרמה"
+                "questions": [
+                  {
+                    "text": "איזה סרט נראה?",
+                    "allowMultiple": false,
+                    "options": [
+                      "קומדיה",
+                      "אקשן",
+                      "דרמה"
+                    ]
+                  },
+                  {
+                    "text": "באיזה סטייל לבוש באים?",
+                    "options": [
+                      "פיג׳מות",
+                      "יומיומי"
+                    ]
+                  },
+                  {
+                    "text": "באיזו שעה נפגשים?",
+                    "allowMultiple": true,
+                    "options": [
+                      "19:00",
+                      "20:00",
+                      "21:00"
+                    ]
+                  }
                 ]
               }
             }
@@ -1566,7 +1778,7 @@
             }
           },
           "409": {
-            "description": "הסקר כבר אושר",
+            "description": "הסקר כבר אושר, או שכבר הצביעו בו",
             "content": {
               "application/json": {
                 "schema": {
@@ -1575,7 +1787,7 @@
                 "example": {
                   "error": {
                     "code": "POLL_LOCKED",
-                    "message": "אי אפשר לשנות או למחוק סקר שכבר אושר"
+                    "message": "אי אפשר לערוך סקר שכבר אושר"
                   }
                 }
               }
@@ -1587,7 +1799,8 @@
         "tags": [
           "Polls"
         ],
-        "summary": "מחיקת סקר (יוצר בלבד, רק לפני אישור)",
+        "summary": "מחיקת סקר (מנהל - תמיד; יוצר - כל עוד אין הצבעות)",
+        "description": "מנהל יכול למחוק כל סקר, והצבעות הסקר נמחקות איתו. היוצר יכול למחוק סקר בכל סטטוס כל עוד אין בו הצבעות.",
         "security": [
           {
             "bearerAuth": []
@@ -1636,7 +1849,7 @@
             }
           },
           "403": {
-            "description": "המשתמש אינו יוצר הסקר",
+            "description": "המשתמש אינו יוצר הסקר ואינו מנהל",
             "content": {
               "application/json": {
                 "schema": {
@@ -1668,7 +1881,7 @@
             }
           },
           "409": {
-            "description": "הסקר כבר אושר",
+            "description": "כבר הצביעו בסקר",
             "content": {
               "application/json": {
                 "schema": {
@@ -1676,8 +1889,8 @@
                 },
                 "example": {
                   "error": {
-                    "code": "POLL_LOCKED",
-                    "message": "אי אפשר לשנות או למחוק סקר שכבר אושר"
+                    "code": "POLL_HAS_VOTES",
+                    "message": "אי אפשר למחוק סקר שכבר הצביעו בו"
                   }
                 }
               }
@@ -1829,11 +2042,12 @@
                   }
                 },
                 "multiple": {
-                  "summary": "בחירה מרובה (רק אם allowMultiple=true)",
+                  "summary": "כמה שאלות - תשובה לכל שאלה (בשאלה עם allowMultiple אפשר כמה)",
                   "value": {
                     "optionIds": [
                       1,
-                      2
+                      4,
+                      5
                     ]
                   }
                 }
@@ -1851,11 +2065,10 @@
                 },
                 "example": {
                   "id": 1,
-                  "title": "איזה סרט נראה בשישי?",
-                  "description": "נפגשים אצל דנה ב-20:00",
+                  "title": "ערב סרט אצל דנה בשישי",
+                  "description": "מביאים פופקורן",
                   "category": "ENTERTAINMENT",
                   "categoryLabel": "בילויים",
-                  "allowMultiple": false,
                   "closesAt": "2026-12-31T20:00:00.000Z",
                   "closedEarlyAt": null,
                   "status": "APPROVED",
@@ -1863,7 +2076,7 @@
                   "isOpen": true,
                   "rejectionReason": null,
                   "voterCount": 3,
-                  "optionCount": 3,
+                  "questionCount": 2,
                   "creator": {
                     "id": 2,
                     "name": "נועה כהן"
@@ -1871,25 +2084,53 @@
                   "hasVoted": true,
                   "createdAt": "2026-10-01T10:00:00.000Z",
                   "updatedAt": "2026-10-01T10:00:00.000Z",
-                  "options": [
+                  "questions": [
                     {
                       "id": 1,
-                      "text": "קומדיה",
-                      "position": 1
+                      "text": "איזה סרט נראה?",
+                      "allowMultiple": false,
+                      "position": 1,
+                      "options": [
+                        {
+                          "id": 1,
+                          "text": "קומדיה",
+                          "position": 1
+                        },
+                        {
+                          "id": 2,
+                          "text": "אקשן",
+                          "position": 2
+                        },
+                        {
+                          "id": 3,
+                          "text": "דרמה",
+                          "position": 3
+                        }
+                      ]
                     },
                     {
                       "id": 2,
-                      "text": "אקשן",
-                      "position": 2
-                    },
-                    {
-                      "id": 3,
-                      "text": "דרמה",
-                      "position": 3
+                      "text": "באיזו שעה נפגשים?",
+                      "allowMultiple": true,
+                      "position": 2,
+                      "options": [
+                        {
+                          "id": 4,
+                          "text": "19:00",
+                          "position": 1
+                        },
+                        {
+                          "id": 5,
+                          "text": "20:00",
+                          "position": 2
+                        }
+                      ]
                     }
                   ],
                   "myChoices": [
-                    1
+                    1,
+                    4,
+                    5
                   ],
                   "permissions": {
                     "canVote": false,
@@ -2093,7 +2334,7 @@
           {
             "name": "search",
             "in": "query",
-            "description": "חיפוש טקסט בכותרת ובתיאור (ללא תלות באותיות גדולות/קטנות)",
+            "description": "חיפוש טקסט בכותרת, בתיאור ובשאלות (ללא תלות באותיות גדולות/קטנות)",
             "schema": {
               "type": "string",
               "maxLength": 100
@@ -2208,7 +2449,7 @@
         "tags": [
           "Admin"
         ],
-        "summary": "אישור סקר ממתין",
+        "summary": "אישור סקר ממתין או נדחה",
         "security": [
           {
             "bearerAuth": []
@@ -2274,7 +2515,7 @@
             }
           },
           "409": {
-            "description": "הסקר לא ממתין, או שתאריך הסגירה עבר",
+            "description": "הסקר כבר מאושר, או שתאריך הסגירה עבר",
             "content": {
               "application/json": {
                 "schema": {
@@ -2283,7 +2524,7 @@
                 "example": {
                   "error": {
                     "code": "INVALID_STATUS",
-                    "message": "אפשר לאשר רק סקר שממתין לאישור"
+                    "message": "הסקר כבר מאושר"
                   }
                 }
               }
@@ -2310,23 +2551,26 @@
         "tags": [
           "Admin"
         ],
-        "summary": "דחיית סקר ממתין (עם סיבה אופציונלית)",
+        "summary": "דחיית סקר ממתין או מאושר (סיבה חובה)",
         "security": [
           {
             "bearerAuth": []
           }
         ],
         "requestBody": {
-          "required": false,
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "reason"
+                ],
                 "properties": {
                   "reason": {
                     "type": "string",
-                    "maxLength": 300,
-                    "nullable": true
+                    "minLength": 1,
+                    "maxLength": 300
                   }
                 }
               },
@@ -2418,7 +2662,7 @@
             }
           },
           "409": {
-            "description": "הסקר לא ממתין לאישור",
+            "description": "הסקר כבר נדחה",
             "content": {
               "application/json": {
                 "schema": {
@@ -2427,7 +2671,7 @@
                 "example": {
                   "error": {
                     "code": "INVALID_STATUS",
-                    "message": "אפשר לדחות רק סקר שממתין לאישור"
+                    "message": "הסקר כבר נדחה"
                   }
                 }
               }

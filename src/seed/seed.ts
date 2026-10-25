@@ -20,39 +20,41 @@ interface DemoPoll {
   title: string;
   description?: string;
   category: PollCategory;
-  allowMultiple?: boolean;
   closesInDays: number;
   status: PollStatus;
   rejectionReason?: string;
   isHidden?: boolean;
   closedEarly?: boolean;
   creator: 'admin' | 'noa' | 'yossi' | 'dana';
-  options: string[];
-  // לכל מצביע - מיקומי האפשרויות שבחר (מתחילים מ-1)
-  votes?: Partial<Record<'admin' | 'noa' | 'yossi' | 'dana', number[]>>;
+  questions: { text: string; allowMultiple?: boolean; options: string[] }[];
+  // לכל מצביע - לכל שאלה (לפי הסדר), מיקומי האפשרויות שבחר (מתחילים מ-1)
+  votes?: Partial<Record<'admin' | 'noa' | 'yossi' | 'dana', number[][]>>;
 }
 
 const DEMO_POLLS: DemoPoll[] = [
   {
-    title: 'איזה סרט נראה בשישי?',
-    description: 'נפגשים אצל דנה ב-20:00, מביאים פופקורן',
+    title: 'ערב סרט אצל דנה בשישי',
+    description: 'מביאים פופקורן',
     category: 'ENTERTAINMENT',
     closesInDays: 5,
     status: 'APPROVED',
     creator: 'noa',
-    options: ['קומדיה', 'אקשן', 'דרמה', 'אנימציה'],
-    votes: { yossi: [1], dana: [1], admin: [2] },
+    questions: [
+      { text: 'איזה סרט נראה?', options: ['קומדיה', 'אקשן', 'דרמה', 'אנימציה'] },
+      { text: 'באיזה סטייל לבוש באים?', options: ['פיג׳מות', 'יומיומי', 'מתלבשים לפי נושא הסרט'] },
+      { text: 'באיזו שעה נפגשים?', allowMultiple: true, options: ['19:00', '20:00', '21:00'] },
+    ],
+    votes: { yossi: [[1], [1], [2, 3]], dana: [[1], [3], [2]], admin: [[2], [1], [1, 2]] },
   },
   {
     title: 'אילו ימים נוחים לכם למפגש הקבוצה?',
     description: 'אפשר לסמן כמה ימים',
     category: 'GENERAL',
-    allowMultiple: true,
     closesInDays: 10,
     status: 'APPROVED',
     creator: 'yossi',
-    options: ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי'],
-    votes: { noa: [1, 3], dana: [3, 5], admin: [3] },
+    questions: [{ text: 'אילו ימים נוחים לכם?', allowMultiple: true, options: ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי'] }],
+    votes: { noa: [[1, 3]], dana: [[3, 5]], admin: [[3]] },
   },
   {
     title: 'לאן נצא לטיול באביב?',
@@ -61,8 +63,8 @@ const DEMO_POLLS: DemoPoll[] = [
     closesInDays: 20,
     status: 'APPROVED',
     creator: 'admin',
-    options: ['עין גדי', 'רמת הגולן', 'מכתש רמון'],
-    votes: { noa: [2] },
+    questions: [{ text: 'לאן נצא לטיול באביב?', options: ['עין גדי', 'רמת הגולן', 'מכתש רמון'] }],
+    votes: { noa: [[2]] },
   },
   {
     title: 'איזו פיצה מזמינים לערב המשחקים?',
@@ -70,8 +72,8 @@ const DEMO_POLLS: DemoPoll[] = [
     closesInDays: -3,
     status: 'APPROVED',
     creator: 'dana',
-    options: ['מרגריטה', 'פטריות', 'זיתים ובצל', 'טבעונית'],
-    votes: { noa: [1], yossi: [2], admin: [1] },
+    questions: [{ text: 'איזו פיצה מזמינים לערב המשחקים?', options: ['מרגריטה', 'פטריות', 'זיתים ובצל', 'טבעונית'] }],
+    votes: { noa: [[1]], yossi: [[2]], admin: [[1]] },
   },
   {
     title: 'איזה ספורט נעשה ביחד בשבת בבוקר?',
@@ -80,8 +82,8 @@ const DEMO_POLLS: DemoPoll[] = [
     status: 'APPROVED',
     closedEarly: true,
     creator: 'noa',
-    options: ['ריצה בפארק', 'כדורעף בחוף', 'רכיבה על אופניים'],
-    votes: { dana: [2], yossi: [2] },
+    questions: [{ text: 'איזה ספורט נעשה ביחד בשבת בבוקר?', options: ['ריצה בפארק', 'כדורעף בחוף', 'רכיבה על אופניים'] }],
+    votes: { dana: [[2]], yossi: [[2]] },
   },
   {
     title: 'איזה קינוח נכין למסיבת סוף השנה?',
@@ -90,7 +92,7 @@ const DEMO_POLLS: DemoPoll[] = [
     closesInDays: 14,
     status: 'PENDING',
     creator: 'noa',
-    options: ['עוגת שוקולד', 'סלט פירות', 'גלידה'],
+    questions: [{ text: 'איזה קינוח נכין למסיבת סוף השנה?', options: ['עוגת שוקולד', 'סלט פירות', 'גלידה'] }],
   },
   {
     title: 'מה דעתכם?',
@@ -99,7 +101,7 @@ const DEMO_POLLS: DemoPoll[] = [
     status: 'REJECTED',
     rejectionReason: 'השאלה לא ברורה, נא לנסח מחדש',
     creator: 'yossi',
-    options: ['כן', 'לא'],
+    questions: [{ text: 'מה דעתכם?', options: ['כן', 'לא'] }],
   },
   {
     title: 'סקר שהוסתר על ידי המנהל',
@@ -109,7 +111,7 @@ const DEMO_POLLS: DemoPoll[] = [
     status: 'APPROVED',
     isHidden: true,
     creator: 'yossi',
-    options: ['אפשרות א', 'אפשרות ב'],
+    questions: [{ text: 'סקר שהוסתר על ידי המנהל', options: ['אפשרות א', 'אפשרות ב'] }],
   },
 ];
 
@@ -179,16 +181,22 @@ export async function seed(prisma: PrismaClient) {
         title: demo.title,
         description: demo.description ?? null,
         category: demo.category,
-        allowMultiple: demo.allowMultiple ?? false,
         closesAt: fromNow(demo.closesInDays),
         status: demo.status,
         rejectionReason: demo.rejectionReason ?? null,
         isHidden: demo.isHidden ?? false,
         closedEarlyAt: demo.closedEarly ? fromNow(-1) : null,
         creatorId: users[demo.creator].id,
-        options: { create: demo.options.map((text, i) => ({ text, position: i + 1 })) },
+        questions: {
+          create: demo.questions.map((q, qi) => ({
+            text: q.text,
+            allowMultiple: q.allowMultiple ?? false,
+            position: qi + 1,
+            options: { create: q.options.map((text, i) => ({ text, position: i + 1 })) },
+          })),
+        },
       },
-      include: { options: true },
+      include: { questions: { orderBy: { position: 'asc' }, include: { options: true } } },
     });
 
     for (const [voter, positions] of Object.entries(demo.votes ?? {})) {
@@ -198,9 +206,11 @@ export async function seed(prisma: PrismaClient) {
           pollId: poll.id,
           userId: user.id,
           choices: {
-            create: (positions ?? []).map((pos) => ({
-              optionId: poll.options.find((o) => o.position === pos)!.id,
-            })),
+            create: (positions ?? []).flatMap((questionPositions, qi) =>
+              questionPositions.map((pos) => ({
+                optionId: poll.questions[qi]!.options.find((o) => o.position === pos)!.id,
+              })),
+            ),
           },
         },
       });

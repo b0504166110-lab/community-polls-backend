@@ -15,11 +15,10 @@ export const adminListQuerySchema = z.object({
 
 export const rejectSchema = z.object({
   reason: z
-    .string()
+    .string({ required_error: 'חובה לציין סיבת דחייה', invalid_type_error: 'סיבת הדחייה חייבת להיות טקסט' })
     .trim()
-    .max(300, 'סיבת הדחייה יכולה להכיל עד 300 תווים')
-    .nullish()
-    .transform((value) => (value ? value : null)),
+    .min(1, 'חובה לציין סיבת דחייה')
+    .max(300, 'סיבת הדחייה יכולה להכיל עד 300 תווים'),
 });
 
 export const visibilitySchema = z.object({

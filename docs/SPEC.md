@@ -40,12 +40,13 @@
 | טבלה | שדות עיקריים | מפתחות ואילוצים |
 |---|---|---|
 | `User` | id, name (2-50), email, passwordHash, role (USER/ADMIN), createdAt | PK id · email ייחודי ובאותיות קטנות |
-| `Poll` | id, title (5-150), description? (≤500), category, allowMultiple, closesAt, status, rejectionReason? (≤300), isHidden, closedEarlyAt?, creatorId, createdAt, updatedAt | PK id · FK creatorId→User · סיבת דחייה רק כש-REJECTED · הסתרה רק כש-APPROVED |
-| `PollOption` | id, pollId, text (1-100), position (1-6) | PK id · FK pollId→Poll (מחיקה מדורגת) · ייחודי (pollId, position) ו-(pollId, text) |
+| `Poll` | id, title (5-150), description? (≤500), category, closesAt, status, rejectionReason? (≤300), isHidden, closedEarlyAt?, creatorId, createdAt, updatedAt | PK id · FK creatorId→User · סיבת דחייה רק כש-REJECTED · הסתרה רק כש-APPROVED |
+| `PollQuestion` | id, pollId, text (2-150), allowMultiple, position (1-10) | PK id · FK pollId→Poll (מחיקה מדורגת) · ייחודי (pollId, position) |
+| `PollOption` | id, questionId, text (1-100), position (1-6) | PK id · FK questionId→PollQuestion (מחיקה מדורגת) · ייחודי (questionId, position) ו-(questionId, text) |
 | `Vote` | id, pollId, userId, createdAt | PK id · FK→Poll, FK→User · **ייחודי (pollId, userId)** - מונע הצבעה כפולה |
 | `VoteChoice` | id, voteId, optionId | PK id · FK→Vote (מדורג), FK→PollOption · ייחודי (voteId, optionId) |
 
-**קשרים:** User 1-* Poll · Poll 1-* PollOption · Poll 1-* Vote · User 1-* Vote · Vote 1-* VoteChoice *-1 PollOption
+**קשרים:** User 1-* Poll · Poll 1-* PollQuestion · PollQuestion 1-* PollOption · Poll 1-* Vote · User 1-* Vote · Vote 1-* VoteChoice *-1 PollOption
 
 ## ה. Endpoints
 ראי [FRONTEND-API-GUIDE.md](../FRONTEND-API-GUIDE.md) ו-Swagger (`/api-docs`) - 17 Endpoints:

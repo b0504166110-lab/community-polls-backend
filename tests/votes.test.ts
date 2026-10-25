@@ -189,8 +189,10 @@ describe('תוצאות - GET /api/polls/:id/results', () => {
 
     const res = await api().get(`/api/polls/${poll.id}/results`).set('Authorization', voters[0]!.auth);
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ totalVoters: 3, totalChoices: 4, myChoices: [o1!.id, o2!.id].sort() });
-    expect(res.body.options).toEqual([
+    expect(res.body).toMatchObject({ totalVoters: 3, myChoices: [o1!.id, o2!.id].sort() });
+    expect(res.body.questions).toHaveLength(1);
+    expect(res.body.questions[0]).toMatchObject({ text: 'שאלת בדיקה', allowMultiple: true, totalChoices: 4 });
+    expect(res.body.questions[0].options).toEqual([
       { id: o1!.id, text: 'ראשון', count: 2, percent: 66.7 },
       { id: o2!.id, text: 'שני', count: 2, percent: 66.7 },
       { id: o3!.id, text: 'שלישי', count: 0, percent: 0 },
@@ -204,5 +206,89 @@ describe('תוצאות - GET /api/polls/:id/results', () => {
     const poll = await createPoll(owner.user.id, { status: 'PENDING' });
     const res = await api().get(`/api/polls/${poll.id}/results`).set('Authorization', owner.auth);
     expect(res.status).toBe(403);
+  });
+});
+
+describe('הצבעה בסקר עם כמה שאלות', () => {
+  const QUESTIONS = [
+    { text: 'איזה סרט נראה?', options: ['קומדיה', 'אקשן'] },
+    { text: 'באיזו שעה נפגשים?', allowMultiple: true, options: ['19:00', '20:00', '21:00'] },
+  ];
+
+  it('עונים על כל השאלות בהצבעה אחת', async () => {
+    const owner = await createUser();
+    const voter = await createUser();
+    const poll = await createPoll(owner.user.id, { questions: QUESTIONS });
+    const [comedy, , at19, at20] = poll.options;
+    const ids = [comedy!.id, at19!.id, at20!.id];
+
+    const res = await api().post(`/api/polls/${poll.id}/votes`).set('Authorization', voter.auth).send({ optionIds: ids });
+    expect(res.status).toBe(201);
+    expect(res.body.myChoices.sort()).toEqual(ids.sort());
+    expect(await prisma.vote.count()).toBe(1);
+  });
+
+  it('שאלה בלי תשובה - 400 ושום דבר לא נשמר', async () => {
+    const owner = await createUser();
+    const voter = await createUser();
+    const poll = await createPoll(owner.user.id, { questions: QUESTIONS });
+    const res = await api()
+      .post(`/api/polls/${poll.id}/votes`)
+      .set('Authorization', voter.auth)
+      .send({ optionIds: [poll.options[0]!.id] });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('באיזו שעה נפגשים?');
+    expect(await prisma.vote.count()).toBe(0);
+  });
+
+  it('שתי תשובות בשאלה בלי בחירה מרובה - 400, גם אם בשאלה אחרת מותר', async () => {
+    const owner = await createUser();
+    const voter = await createUser();
+    const poll = await createPoll(owner.user.id, { questions: QUESTIONS });
+    const [comedy, action, at19] = poll.options;
+    const res = await api()
+      .post(`/api/polls/${poll.id}/votes`)
+      .set('Authorization', voter.auth)
+      .send({ optionIds: [comedy!.id, action!.id, at19!.id] });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('איזה סרט נראה?');
+  });
+
+  it('תוצאות נפרדות לכל שאלה', async () => {
+    const owner = await createUser();
+    const poll = await createPoll(owner.user.id, { questions: QUESTIONS });
+    const [comedy, action, at19, at20, at21] = poll.options;
+    const voters = await Promise.all([createUser(), createUser()]);
+    const picks = [[comedy!.id, at19!.id, at20!.id], [action!.id, at20!.id]];
+    for (let i = 0; i < voters.length; i += 1) {
+      await api().post(`/api/polls/${poll.id}/votes`).set('Authorization', voters[i]!.auth).send({ optionIds: picks[i] }).expect(201);
+    }
+
+    const res = await api().get(`/api/polls/${poll.id}/results`).set('Authorization', voters[0]!.auth);
+    expect(res.status).toBe(200);
+    expect(res.body.totalVoters).toBe(2);
+    expect(res.body.questions).toEqual([
+      {
+        id: poll.questions[0]!.id,
+        text: 'איזה סרט נראה?',
+        allowMultiple: false,
+        totalChoices: 2,
+        options: [
+          { id: comedy!.id, text: 'קומדיה', count: 1, percent: 50 },
+          { id: action!.id, text: 'אקשן', count: 1, percent: 50 },
+        ],
+      },
+      {
+        id: poll.questions[1]!.id,
+        text: 'באיזו שעה נפגשים?',
+        allowMultiple: true,
+        totalChoices: 3,
+        options: [
+          { id: at19!.id, text: '19:00', count: 1, percent: 50 },
+          { id: at20!.id, text: '20:00', count: 2, percent: 100 },
+          { id: at21!.id, text: '21:00', count: 0, percent: 0 },
+        ],
+      },
+    ]);
   });
 });

@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 
+# סודות - לעולם לא עולים ל-GitHub
 .env
 .env.*
 !.env.example

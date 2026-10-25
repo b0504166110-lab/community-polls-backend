@@ -48,8 +48,8 @@ async function findPoll(id: number) {
 
 export async function approvePoll(id: number, admin: AuthUser) {
   const poll = await findPoll(id);
-  if (poll.status !== 'PENDING') {
-    throw AppError.conflict('INVALID_STATUS', 'אפשר לאשר רק סקר שממתין לאישור');
+  if (poll.status === 'APPROVED') {
+    throw AppError.conflict('INVALID_STATUS', 'הסקר כבר מאושר');
   }
   if (poll.closesAt <= new Date()) {
     throw AppError.conflict('POLL_EXPIRED', 'תאריך הסגירה של הסקר כבר עבר - יש לדחות אותו כדי שהיוצר יעדכן תאריך');
@@ -58,10 +58,10 @@ export async function approvePoll(id: number, admin: AuthUser) {
   return getPoll(id, admin);
 }
 
-export async function rejectPoll(id: number, reason: string | null, admin: AuthUser) {
+export async function rejectPoll(id: number, reason: string, admin: AuthUser) {
   const poll = await findPoll(id);
-  if (poll.status !== 'PENDING') {
-    throw AppError.conflict('INVALID_STATUS', 'אפשר לדחות רק סקר שממתין לאישור');
+  if (poll.status === 'REJECTED') {
+    throw AppError.conflict('INVALID_STATUS', 'הסקר כבר נדחה');
   }
   await prisma.poll.update({ where: { id }, data: { status: 'REJECTED', rejectionReason: reason } });
   return getPoll(id, admin);

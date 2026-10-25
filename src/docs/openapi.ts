@@ -51,7 +51,7 @@ const pageParams = [
 const searchParam = {
   name: 'search',
   in: 'query',
-  description: 'חיפוש טקסט בכותרת ובתיאור (ללא תלות באותיות גדולות/קטנות)',
+  description: 'חיפוש טקסט בכותרת, בתיאור ובשאלות (ללא תלות באותיות גדולות/קטנות)',
   schema: { type: 'string', maxLength: 100 },
   example: 'סרט',
 };
@@ -68,11 +68,10 @@ const json = (schemaRef: string, example?: unknown) => ({
 
 const pollDetailsExample = {
   id: 1,
-  title: 'איזה סרט נראה בשישי?',
-  description: 'נפגשים אצל דנה ב-20:00',
+  title: 'ערב סרט אצל דנה בשישי',
+  description: 'מביאים פופקורן',
   category: 'ENTERTAINMENT',
   categoryLabel: 'בילויים',
-  allowMultiple: false,
   closesAt: '2026-12-31T20:00:00.000Z',
   closedEarlyAt: null,
   status: 'APPROVED',
@@ -80,27 +79,48 @@ const pollDetailsExample = {
   isOpen: true,
   rejectionReason: null,
   voterCount: 3,
-  optionCount: 3,
+  questionCount: 2,
   creator: { id: 2, name: 'נועה כהן' },
   hasVoted: true,
   createdAt: '2026-10-01T10:00:00.000Z',
   updatedAt: '2026-10-01T10:00:00.000Z',
-  options: [
-    { id: 1, text: 'קומדיה', position: 1 },
-    { id: 2, text: 'אקשן', position: 2 },
-    { id: 3, text: 'דרמה', position: 3 },
+  questions: [
+    {
+      id: 1,
+      text: 'איזה סרט נראה?',
+      allowMultiple: false,
+      position: 1,
+      options: [
+        { id: 1, text: 'קומדיה', position: 1 },
+        { id: 2, text: 'אקשן', position: 2 },
+        { id: 3, text: 'דרמה', position: 3 },
+      ],
+    },
+    {
+      id: 2,
+      text: 'באיזו שעה נפגשים?',
+      allowMultiple: true,
+      position: 2,
+      options: [
+        { id: 4, text: '19:00', position: 1 },
+        { id: 5, text: '20:00', position: 2 },
+      ],
+    },
   ],
-  myChoices: [1],
+  myChoices: [1, 4, 5],
   permissions: { canVote: false, canSeeResults: true, canEdit: false, canDelete: false, canClose: false },
 };
 
 const pollInputExample = {
-  title: 'איזה סרט נראה בשישי?',
-  description: 'נפגשים אצל דנה ב-20:00',
+  title: 'ערב סרט אצל דנה בשישי',
+  description: 'מביאים פופקורן',
   category: 'ENTERTAINMENT',
-  allowMultiple: false,
   closesAt: '2026-12-31T20:00:00.000Z',
-  options: ['קומדיה', 'אקשן', 'דרמה'],
+  questions: [
+    { text: 'איזה סרט נראה?', allowMultiple: false, options: ['קומדיה', 'אקשן', 'דרמה'] },
+    { text: 'באיזה סטייל לבוש באים?', options: ['פיג׳מות', 'יומיומי'] },
+    { text: 'באיזו שעה נפגשים?', allowMultiple: true, options: ['19:00', '20:00', '21:00'] },
+  ],
 };
 
 export const openApiSpec = {
@@ -228,8 +248,8 @@ export const openApiSpec = {
       PollSummary: {
         type: 'object',
         required: [
-          'id', 'title', 'description', 'category', 'categoryLabel', 'allowMultiple', 'closesAt', 'closedEarlyAt',
-          'status', 'isHidden', 'isOpen', 'rejectionReason', 'voterCount', 'optionCount', 'creator', 'hasVoted',
+          'id', 'title', 'description', 'category', 'categoryLabel', 'closesAt', 'closedEarlyAt',
+          'status', 'isHidden', 'isOpen', 'rejectionReason', 'voterCount', 'questionCount', 'creator', 'hasVoted',
           'createdAt', 'updatedAt',
         ],
         properties: {
@@ -238,7 +258,6 @@ export const openApiSpec = {
           description: { type: 'string', nullable: true, example: 'נפגשים אצל דנה ב-20:00' },
           category: { $ref: '#/components/schemas/PollCategory' },
           categoryLabel: { type: 'string', example: 'בילויים' },
-          allowMultiple: { type: 'boolean', description: 'האם מותר לבחור כמה תשובות' },
           closesAt: { type: 'string', format: 'date-time' },
           closedEarlyAt: { type: 'string', format: 'date-time', nullable: true, description: 'מתי היוצר סגר את הסקר מוקדם' },
           status: { $ref: '#/components/schemas/PollStatus' },
@@ -246,7 +265,7 @@ export const openApiSpec = {
           isOpen: { type: 'boolean', description: 'מאושר, לא מוסתר, לא נסגר ותאריך הסגירה לא עבר' },
           rejectionReason: { type: 'string', nullable: true, description: 'גלוי רק ליוצר ולמנהל' },
           voterCount: { type: 'integer', description: 'מספר המצביעים', example: 3 },
-          optionCount: { type: 'integer', example: 3 },
+          questionCount: { type: 'integer', description: 'מספר השאלות בסקר', example: 2 },
           creator: { $ref: '#/components/schemas/Creator' },
           hasVoted: { type: 'boolean', description: 'האם המשתמש המחובר כבר הצביע (לאורח תמיד false)' },
           createdAt: { type: 'string', format: 'date-time' },
@@ -260,6 +279,17 @@ export const openApiSpec = {
           id: { type: 'integer', example: 1 },
           text: { type: 'string', example: 'קומדיה' },
           position: { type: 'integer', example: 1 },
+        },
+      },
+      PollQuestion: {
+        type: 'object',
+        required: ['id', 'text', 'allowMultiple', 'position', 'options'],
+        properties: {
+          id: { type: 'integer', example: 1 },
+          text: { type: 'string', example: 'איזה סרט נראה?' },
+          allowMultiple: { type: 'boolean', description: 'האם מותר לבחור כמה תשובות בשאלה הזו' },
+          position: { type: 'integer', example: 1 },
+          options: { type: 'array', items: { $ref: '#/components/schemas/PollOption' } },
         },
       },
       PollPermissions: {
@@ -279,9 +309,9 @@ export const openApiSpec = {
           { $ref: '#/components/schemas/PollSummary' },
           {
             type: 'object',
-            required: ['options', 'myChoices', 'permissions'],
+            required: ['questions', 'myChoices', 'permissions'],
             properties: {
-              options: { type: 'array', items: { $ref: '#/components/schemas/PollOption' } },
+              questions: { type: 'array', items: { $ref: '#/components/schemas/PollQuestion' } },
               myChoices: {
                 type: 'array',
                 items: { type: 'integer' },
@@ -294,19 +324,32 @@ export const openApiSpec = {
       },
       PollInput: {
         type: 'object',
-        required: ['title', 'category', 'closesAt', 'options'],
+        required: ['title', 'category', 'closesAt', 'questions'],
         properties: {
           title: { type: 'string', minLength: 5, maxLength: 150 },
           description: { type: 'string', maxLength: 500, nullable: true },
           category: { $ref: '#/components/schemas/PollCategory' },
-          allowMultiple: { type: 'boolean', default: false },
           closesAt: { type: 'string', format: 'date-time', description: 'בעתיד, ועד שנה מהיום (פורמט ISO)' },
-          options: {
+          questions: {
             type: 'array',
-            minItems: 2,
-            maxItems: 6,
-            description: '2-6 אפשרויות שונות, כל אחת 1-100 תווים',
-            items: { type: 'string', minLength: 1, maxLength: 100 },
+            minItems: 1,
+            maxItems: 10,
+            description: '1-10 שאלות. הסדר נשמר',
+            items: {
+              type: 'object',
+              required: ['text', 'options'],
+              properties: {
+                text: { type: 'string', minLength: 2, maxLength: 150 },
+                allowMultiple: { type: 'boolean', default: false },
+                options: {
+                  type: 'array',
+                  minItems: 2,
+                  maxItems: 6,
+                  description: '2-6 אפשרויות שונות, כל אחת 1-100 תווים',
+                  items: { type: 'string', minLength: 1, maxLength: 100 },
+                },
+              },
+            },
           },
         },
         example: pollInputExample,
@@ -319,31 +362,42 @@ export const openApiSpec = {
             type: 'array',
             minItems: 1,
             items: { type: 'integer' },
-            description: 'בסקר רגיל - בדיוק מזהה אחד. בסקר עם בחירה מרובה - אחד או יותר',
+            description: 'מזהי האפשרויות מכל השאלות יחד. חובה לענות על כל שאלה: בדיוק אפשרות אחת, או אחת ומעלה בשאלה עם allowMultiple',
           },
         },
         example: { optionIds: [1] },
       },
       PollResults: {
         type: 'object',
-        required: ['pollId', 'title', 'allowMultiple', 'isOpen', 'totalVoters', 'totalChoices', 'options', 'myChoices'],
+        required: ['pollId', 'title', 'isOpen', 'totalVoters', 'questions', 'myChoices'],
         properties: {
           pollId: { type: 'integer' },
           title: { type: 'string' },
-          allowMultiple: { type: 'boolean' },
           isOpen: { type: 'boolean' },
           totalVoters: { type: 'integer', description: 'מספר המצביעים' },
-          totalChoices: { type: 'integer', description: 'סך כל הבחירות (בבחירה מרובה יכול להיות גדול ממספר המצביעים)' },
-          options: {
+          questions: {
             type: 'array',
             items: {
               type: 'object',
-              required: ['id', 'text', 'count', 'percent'],
+              required: ['id', 'text', 'allowMultiple', 'totalChoices', 'options'],
               properties: {
                 id: { type: 'integer' },
                 text: { type: 'string' },
-                count: { type: 'integer' },
-                percent: { type: 'number', description: 'אחוז מתוך המצביעים, ספרה אחת אחרי הנקודה' },
+                allowMultiple: { type: 'boolean' },
+                totalChoices: { type: 'integer', description: 'סך הבחירות בשאלה (בבחירה מרובה יכול להיות גדול ממספר המצביעים)' },
+                options: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    required: ['id', 'text', 'count', 'percent'],
+                    properties: {
+                      id: { type: 'integer' },
+                      text: { type: 'string' },
+                      count: { type: 'integer' },
+                      percent: { type: 'number', description: 'אחוז מתוך המצביעים, ספרה אחת אחרי הנקודה' },
+                    },
+                  },
+                },
               },
             },
           },
@@ -351,17 +405,33 @@ export const openApiSpec = {
         },
         example: {
           pollId: 1,
-          title: 'איזה סרט נראה בשישי?',
-          allowMultiple: false,
+          title: 'ערב סרט אצל דנה בשישי',
           isOpen: true,
           totalVoters: 3,
-          totalChoices: 3,
-          options: [
-            { id: 1, text: 'קומדיה', count: 2, percent: 66.7 },
-            { id: 2, text: 'אקשן', count: 1, percent: 33.3 },
-            { id: 3, text: 'דרמה', count: 0, percent: 0 },
+          questions: [
+            {
+              id: 1,
+              text: 'איזה סרט נראה?',
+              allowMultiple: false,
+              totalChoices: 3,
+              options: [
+                { id: 1, text: 'קומדיה', count: 2, percent: 66.7 },
+                { id: 2, text: 'אקשן', count: 1, percent: 33.3 },
+                { id: 3, text: 'דרמה', count: 0, percent: 0 },
+              ],
+            },
+            {
+              id: 2,
+              text: 'באיזו שעה נפגשים?',
+              allowMultiple: true,
+              totalChoices: 4,
+              options: [
+                { id: 4, text: '19:00', count: 1, percent: 33.3 },
+                { id: 5, text: '20:00', count: 3, percent: 100 },
+              ],
+            },
           ],
-          myChoices: [1],
+          myChoices: [1, 4, 5],
         },
       },
       PollList: {
@@ -581,20 +651,21 @@ export const openApiSpec = {
           401: R.unauthorized,
           403: errorResponse('המשתמש אינו יוצר הסקר', 'FORBIDDEN', 'רק יוצר הסקר יכול לבצע פעולה זו'),
           404: R.notFound,
-          409: errorResponse('הסקר כבר אושר', 'POLL_LOCKED', 'אי אפשר לשנות או למחוק סקר שכבר אושר'),
+          409: errorResponse('הסקר כבר אושר, או שכבר הצביעו בו', 'POLL_LOCKED', 'אי אפשר לערוך סקר שכבר אושר'),
         },
       },
       delete: {
         tags: ['Polls'],
-        summary: 'מחיקת סקר (יוצר בלבד, רק לפני אישור)',
+        summary: 'מחיקת סקר (מנהל - תמיד; יוצר - כל עוד אין הצבעות)',
+        description: 'מנהל יכול למחוק כל סקר, והצבעות הסקר נמחקות איתו. היוצר יכול למחוק סקר בכל סטטוס כל עוד אין בו הצבעות.',
         security: bearer,
         responses: {
           204: { description: 'הסקר נמחק' },
           400: R.validation,
           401: R.unauthorized,
-          403: errorResponse('המשתמש אינו יוצר הסקר', 'FORBIDDEN', 'רק יוצר הסקר יכול לבצע פעולה זו'),
+          403: errorResponse('המשתמש אינו יוצר הסקר ואינו מנהל', 'FORBIDDEN', 'רק יוצר הסקר יכול לבצע פעולה זו'),
           404: R.notFound,
-          409: errorResponse('הסקר כבר אושר', 'POLL_LOCKED', 'אי אפשר לשנות או למחוק סקר שכבר אושר'),
+          409: errorResponse('כבר הצביעו בסקר', 'POLL_HAS_VOTES', 'אי אפשר למחוק סקר שכבר הצביעו בו'),
         },
       },
     },
@@ -626,7 +697,7 @@ export const openApiSpec = {
               schema: { $ref: '#/components/schemas/VoteRequest' },
               examples: {
                 single: { summary: 'בחירה אחת', value: { optionIds: [1] } },
-                multiple: { summary: 'בחירה מרובה (רק אם allowMultiple=true)', value: { optionIds: [1, 2] } },
+                multiple: { summary: 'כמה שאלות - תשובה לכל שאלה (בשאלה עם allowMultiple אפשר כמה)', value: { optionIds: [1, 4, 5] } },
               },
             },
           },
@@ -679,14 +750,14 @@ export const openApiSpec = {
       parameters: [idParam],
       post: {
         tags: ['Admin'],
-        summary: 'אישור סקר ממתין',
+        summary: 'אישור סקר ממתין או נדחה',
         security: bearer,
         responses: {
           200: { description: 'הסקר אושר', content: json('PollDetails') },
           401: R.unauthorized,
           403: R.adminOnly,
           404: R.notFound,
-          409: errorResponse('הסקר לא ממתין, או שתאריך הסגירה עבר', 'INVALID_STATUS', 'אפשר לאשר רק סקר שממתין לאישור'),
+          409: errorResponse('הסקר כבר מאושר, או שתאריך הסגירה עבר', 'INVALID_STATUS', 'הסקר כבר מאושר'),
         },
       },
     },
@@ -694,15 +765,16 @@ export const openApiSpec = {
       parameters: [idParam],
       post: {
         tags: ['Admin'],
-        summary: 'דחיית סקר ממתין (עם סיבה אופציונלית)',
+        summary: 'דחיית סקר ממתין או מאושר (סיבה חובה)',
         security: bearer,
         requestBody: {
-          required: false,
+          required: true,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                properties: { reason: { type: 'string', maxLength: 300, nullable: true } },
+                required: ['reason'],
+                properties: { reason: { type: 'string', minLength: 1, maxLength: 300 } },
               },
               example: { reason: 'השאלה לא ברורה, נא לנסח מחדש' },
             },
@@ -714,7 +786,7 @@ export const openApiSpec = {
           401: R.unauthorized,
           403: R.adminOnly,
           404: R.notFound,
-          409: errorResponse('הסקר לא ממתין לאישור', 'INVALID_STATUS', 'אפשר לדחות רק סקר שממתין לאישור'),
+          409: errorResponse('הסקר כבר נדחה', 'INVALID_STATUS', 'הסקר כבר נדחה'),
         },
       },
     },
